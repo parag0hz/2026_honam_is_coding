@@ -1,0 +1,24 @@
+# Secrets - never commit real API keys
+.env
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+backend/__pycache__/
+
+# Node (frontend also has its own .gitignore, this covers root-level runs)
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+node_modules/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Contest orientation material (not part of the project source)
+2026 호남IS 코딩챌린지_OT자료(0820_최신판).pdf
