@@ -26,3 +26,14 @@ export async function fetchHealth() {
   const response = await fetch(`${API_BASE_URL}/api/health`);
   return handleResponse(response);
 }
+
+export async function analyzePhoto(file, environmentResult) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("environment_result", JSON.stringify(environmentResult ?? {}));
+  const response = await fetch(`${API_BASE_URL}/api/analyze-photo`, {
+    method: "POST",
+    body: formData,
+  });
+  return handleResponse(response);
+}

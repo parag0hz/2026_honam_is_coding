@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { fetchRiskAssessment, fetchSimulatedSensorData } from './api'
-import InputForm from './components/InputForm'
+import DetailAccordion from './components/DetailAccordion'
+import PhotoCheck from './components/PhotoCheck'
 import RiskGauge from './components/RiskGauge'
-import SensorChart from './components/SensorChart'
+import StatusBadges from './components/StatusBadges'
+import { getFieldBadges } from './riskDisplay'
 
 const DEFAULT_FORM_VALUES = {
   air_temp_c: 14.0,
@@ -18,17 +20,19 @@ function App() {
   const [sensorData, setSensorData] = useState(null)
   const [formValues, setFormValues] = useState(DEFAULT_FORM_VALUES)
   const [riskResult, setRiskResult] = useState(null)
-  const [isLoadingSensor, setIsLoadingSensor] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [isAssessing, setIsAssessing] = useState(false)
   const [error, setError] = useState('')
+  const [photoOverride, setPhotoOverride] = useState(null)
 
-  const handleLoadSensorData = async () => {
-    setIsLoadingSensor(true)
+  // 새로고침 아이콘과 최초 로드가 공유하는 자동 판정 루틴: 새 가상 데이터를 불러와 바로 위험도 판단까지 실행한다.
+  const runAutoAssessment = useCallback(async () => {
+    setIsLoading(true)
     setError('')
+    setPhotoOverride(null) // 새 환경 데이터가 들어오면 이전 사진 판독 결과는 더 이상 유효하지 않다.
     try {
       const data = await fetchSimulatedSensorData()
-      setSensorData(data)
-      setFormValues({
+      const nextValues = {
         air_temp_c: data.air_temp_c,
         soil_temp_c: data.soil_temp_c,
         soil_moisture_pct: data.soil_moisture_pct,
@@ -36,18 +40,27 @@ function App() {
         humidity_pct: data.humidity_pct,
         recent_3day_avg_temp_c: data.recent_3day_avg_temp_c,
         accumulated_temperature: data.accumulated_temperature,
-      })
+      }
+      setSensorData(data)
+      setFormValues(nextValues)
+      const result = await fetchRiskAssessment(nextValues)
+      setRiskResult(result)
     } catch (err) {
-      setError(err.message || '센서 데이터를 불러오지 못했습니다.')
+      setError(err.message || '데이터를 불러오지 못했습니다.')
     } finally {
-      setIsLoadingSensor(false)
+      setIsLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    runAutoAssessment()
+  }, [runAutoAssessment])
 
   const handleFormChange = (key, value) => {
     setFormValues((prev) => ({ ...prev, [key]: value }))
   }
 
+  // 상세 데이터 폼에서 값을 직접 수정했을 때만 쓰는 수동 재판단(심사위원이 근거를 검증할 수 있도록 유지).
   const handleAssessRisk = async () => {
     setIsAssessing(true)
     setError('')
@@ -61,58 +74,52 @@ function App() {
     }
   }
 
+  const badges = getFieldBadges(formValues)
+
   return (
-    <div className="min-h-screen bg-gray-100 px-4 py-8">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-6 text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Fruit-Harness AI</h1>
-          <p className="mt-2 text-gray-600">
-            환상박피(girdling) 시공, 지금 해도 안전할까요? 기상·토양·수액 데이터로 미리 확인하세요.
-          </p>
-          <p className="mt-1 text-xs text-gray-400">
-            ※ 실제 센서 연동 전 단계로, 아래 데이터는 모두 데모용 가상(mock) 데이터입니다.
-          </p>
+    <div className="min-h-screen bg-gray-100 px-4 py-6">
+      <div className="mx-auto max-w-3xl">
+        <header className="mb-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Fruit-Harness AI</h1>
+            <p className="text-xs text-gray-400">※ 데모용 가상(mock) 센서 데이터 기반 판단입니다.</p>
+          </div>
+          <button
+            type="button"
+            onClick={runAutoAssessment}
+            disabled={isLoading}
+            aria-label="새로고침"
+            title="다시 판정하기"
+            className="rounded-full border border-gray-300 bg-white p-3 text-xl shadow-sm hover:bg-gray-50 disabled:opacity-50"
+          >
+            🔄
+          </button>
         </header>
 
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
+        <RiskGauge result={riskResult} isLoading={isLoading} error={error} photoOverride={photoOverride} />
+
+        {riskResult && (
+          <div className="mt-4">
+            <PhotoCheck key={sensorData?.timestamp} environmentResult={riskResult} onResult={setPhotoOverride} />
           </div>
         )}
 
-        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-800">1. 가상 센서 데이터 불러오기</h2>
-              <p className="text-sm text-gray-500">최근 7일 기온/토양수분/수액지수 데이터를 시뮬레이션합니다.</p>
-            </div>
-            <button
-              type="button"
-              onClick={handleLoadSensorData}
-              disabled={isLoadingSensor}
-              className="rounded-lg bg-blue-600 px-5 py-3 text-lg font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isLoadingSensor ? '불러오는 중...' : '가상 센서 데이터 불러오기'}
-            </button>
-          </div>
-          <div className="mt-4">
-            <SensorChart history={sensorData?.history} />
-          </div>
+        <div className="my-4">
+          <StatusBadges badges={badges} />
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <InputForm
-            values={formValues}
-            onChange={handleFormChange}
-            onSubmit={handleAssessRisk}
-            isSubmitting={isAssessing}
-          />
-          <RiskGauge result={riskResult} />
-        </div>
+        <DetailAccordion
+          history={sensorData?.history}
+          values={formValues}
+          onChange={handleFormChange}
+          onSubmit={handleAssessRisk}
+          isSubmitting={isAssessing}
+        />
       </div>
     </div>
   )
 }
 
 export default App
+
 
