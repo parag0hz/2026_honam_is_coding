@@ -23,22 +23,29 @@ function App() {
   const loadSimulationData = async () => {
     setIsSimulating(true)
     setError(null)
-    setRiskResult(null) // 새로운 데이터 로드 시 판단 결과 초기화
+    setRiskResult(null)
     setPhotoResult(null)
     try {
       const { history: sensorHistory, ...current } = await fetchSimulatedSensorData()
       setSensorData(current)
       setHistory(sensorHistory)
+
+      // 센서 데이터 로드 직후 바로 이어서 위험도까지 자동 판단
+      setIsAssessing(true)
+      const result = await fetchRiskAssessment(current)
+      setRiskResult(result)
     } catch (err) {
       setError(err.message)
     } finally {
       setIsSimulating(false)
+      setIsAssessing(false)
     }
   }
 
   const handleValueChange = (key, value) => {
     setSensorData((prev) => ({ ...prev, [key]: value }))
-    setRiskResult(null) // 값이 수정되면 판단 결과 초기화
+    setRiskResult(null)
+    setPhotoResult(null) // 값을 수정하면 이전 사진 판독 결과도 무효화 (안 맞는 결과 노출 방지)
   }
 
   // 3단계: 가드레일 위험도 진단

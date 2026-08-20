@@ -6,12 +6,16 @@ function PhotoCheck({ environmentResult, onResult }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [coloringPercent, setColoringPercent] = useState(null)
   const [error, setError] = useState('')
+  const [previewUrl, setPreviewUrl] = useState(null)
   const isReady = Boolean(environmentResult)
 
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file || !isReady) return
+
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setPreviewUrl(URL.createObjectURL(file))
 
     setIsAnalyzing(true)
     setError('')
@@ -55,6 +59,16 @@ function PhotoCheck({ environmentResult, onResult }) {
 
       {!isReady && (
         <p className="mt-3 text-sm text-gray-400">먼저 위험도 판단을 완료해 주세요.</p>
+      )}
+
+      {previewUrl && (
+        <div className="mt-4">
+          <img
+            src={previewUrl}
+            alt="업로드한 과일 사진"
+            className="mx-auto max-h-48 rounded-lg object-cover shadow-sm"
+          />
+        </div>
       )}
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
