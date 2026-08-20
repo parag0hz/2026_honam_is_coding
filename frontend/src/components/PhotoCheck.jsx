@@ -6,11 +6,12 @@ function PhotoCheck({ environmentResult, onResult }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [coloringPercent, setColoringPercent] = useState(null)
   const [error, setError] = useState('')
+  const isReady = Boolean(environmentResult)
 
   const handleFileChange = async (event) => {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (!file) return
+    if (!file || !isReady) return
 
     setIsAnalyzing(true)
     setError('')
@@ -46,11 +47,15 @@ function PhotoCheck({ environmentResult, onResult }) {
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        disabled={isAnalyzing}
+        disabled={isAnalyzing || !isReady}
         className="rounded-lg bg-orange-500 px-5 py-3 text-lg font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
       >
         {isAnalyzing ? '사진 분석 중...' : '📸 착색 상태 확인하기'}
       </button>
+
+      {!isReady && (
+        <p className="mt-3 text-sm text-gray-400">먼저 위험도 판단을 완료해 주세요.</p>
+      )}
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 

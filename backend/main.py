@@ -49,7 +49,7 @@ _COLORING_READY_STAGES = {"진행중", "완숙"}
 def _build_final_message(environment_verdict: Dict[str, Any], coloring_result: Dict[str, Any]) -> str:
     """환경 위험도 판단과 착색 판독 결과를 합쳐 최종 권고 문장 하나를 만든다."""
     if coloring_result.get("is_fallback"):
-        return "사진 판독에 실패했습니다. 사진을 다시 지어 주세요."
+        return "사진 판독에 실패했습니다. 사진을 다시 찍어 주세요."
 
     env_is_safe = environment_verdict.get("risk_level") == "safe"
     coloring_ready = coloring_result.get("stage") in _COLORING_READY_STAGES
@@ -57,9 +57,7 @@ def _build_final_message(environment_verdict: Dict[str, Any], coloring_result: D
     if env_is_safe and coloring_ready:
         return "지금 박피하기 좋은 시기예요."
     if env_is_safe and not coloring_ready:
-        percent = coloring_result.get("coloring_percent") or 0
-        remaining_days = max(1, round((70 - percent) / 10))
-        return f"환경은 괜찮지만 착색이 아직이에요. {remaining_days}일 정도 더 기다려보세요."
+        return "환경은 괜찮지만 착색이 아직이에요. 착색 상태를 다시 확인한 뒤 판단하세요."
     if not env_is_safe and coloring_ready:
         return "착색은 됐지만 지금은 환경이 위험해요. 날씨가 안정되면 진행하세요."
     return "환경도 위험하고 착색도 안 되었어요. 박피를 미루세요."

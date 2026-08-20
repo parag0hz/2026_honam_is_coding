@@ -1,125 +1,117 @@
-import { useCallback, useEffect, useState } from 'react'
-import { fetchRiskAssessment, fetchSimulatedSensorData } from './api'
+import { useState, useEffect } from 'react'
 import DetailAccordion from './components/DetailAccordion'
 import PhotoCheck from './components/PhotoCheck'
 import RiskGauge from './components/RiskGauge'
 import StatusBadges from './components/StatusBadges'
+import { fetchRiskAssessment, fetchSimulatedSensorData } from './api'
 import { getFieldBadges } from './riskDisplay'
-
-const DEFAULT_FORM_VALUES = {
-  air_temp_c: 14.0,
-  soil_temp_c: 11.0,
-  soil_moisture_pct: 40.0,
-  sap_flow_index: 55.0,
-  humidity_pct: 60.0,
-  recent_3day_avg_temp_c: 13.0,
-  accumulated_temperature: 250.0,
-}
 
 function App() {
   const [sensorData, setSensorData] = useState(null)
-  const [formValues, setFormValues] = useState(DEFAULT_FORM_VALUES)
+  const [history, setHistory] = useState([])
   const [riskResult, setRiskResult] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [photoResult, setPhotoResult] = useState(null)
+  const [isSimulating, setIsSimulating] = useState(false)
   const [isAssessing, setIsAssessing] = useState(false)
-  const [error, setError] = useState('')
-  const [photoOverride, setPhotoOverride] = useState(null)
+  const [error, setError] = useState(null)
 
-  // 새로고침 아이콘과 최초 로드가 공유하는 자동 판정 루틴: 새 가상 데이터를 불러와 바로 위험도 판단까지 실행한다.
-  const runAutoAssessment = useCallback(async () => {
-    setIsLoading(true)
-    setError('')
-    setPhotoOverride(null) // 새 환경 데이터가 들어오면 이전 사진 판독 결과는 더 이상 유효하지 않다.
-    try {
-      const data = await fetchSimulatedSensorData()
-      const nextValues = {
-        air_temp_c: data.air_temp_c,
-        soil_temp_c: data.soil_temp_c,
-        soil_moisture_pct: data.soil_moisture_pct,
-        sap_flow_index: data.sap_flow_index,
-        humidity_pct: data.humidity_pct,
-        recent_3day_avg_temp_c: data.recent_3day_avg_temp_c,
-        accumulated_temperature: data.accumulated_temperature,
-      }
-      setSensorData(data)
-      setFormValues(nextValues)
-      const result = await fetchRiskAssessment(nextValues)
-      setRiskResult(result)
-    } catch (err) {
-      setError(err.message || '데이터를 불러오지 못했습니다.')
-    } finally {
-      setIsLoading(false)
-    }
+  // 1단계: 모니터링 (초기 데이터 로드)
+  useEffect(() => {
+    loadSimulationData()
   }, [])
 
-  useEffect(() => {
-    runAutoAssessment()
-  }, [runAutoAssessment])
-
-  const handleFormChange = (key, value) => {
-    setFormValues((prev) => ({ ...prev, [key]: value }))
+  const loadSimulationData = async () => {
+    setIsSimulating(true)
+    setError(null)
+    setRiskResult(null) // 새로운 데이터 로드 시 판단 결과 초기화
+    setPhotoResult(null)
+    try {
+      const { history: sensorHistory, ...current } = await fetchSimulatedSensorData()
+      setSensorData(current)
+      setHistory(sensorHistory)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setIsSimulating(false)
+    }
   }
 
-  // 상세 데이터 폼에서 값을 직접 수정했을 때만 쓰는 수동 재판단(심사위원이 근거를 검증할 수 있도록 유지).
+  const handleValueChange = (key, value) => {
+    setSensorData((prev) => ({ ...prev, [key]: value }))
+    setRiskResult(null) // 값이 수정되면 판단 결과 초기화
+  }
+
+  // 3단계: 가드레일 위험도 진단
   const handleAssessRisk = async () => {
+    if (!sensorData) return
     setIsAssessing(true)
-    setError('')
+    setError(null)
     try {
-      const result = await fetchRiskAssessment(formValues)
+      const result = await fetchRiskAssessment(sensorData)
       setRiskResult(result)
     } catch (err) {
-      setError(err.message || '위험도 판단에 실패했습니다.')
+      setError(err.message)
     } finally {
       setIsAssessing(false)
     }
   }
 
-  const badges = getFieldBadges(formValues)
-
   return (
-    <div className="min-h-screen bg-gray-100 px-4 py-6">
-      <div className="mx-auto max-w-3xl">
-        <header className="mb-4 flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50 pb-20 font-sans text-gray-900">
+      <header className="bg-white px-6 py-4 shadow-sm">
+        <div className="mx-auto flex max-w-4xl items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Fruit-Harness AI</h1>
-            <p className="text-xs text-gray-400">※ 데모용 가상(mock) 센서 데이터 기반 판단입니다.</p>
+            <h1 className="text-2xl font-bold text-gray-900">Fruit-Harness AI</h1>
+            <p className="text-sm text-gray-500">※ 데모용 가상(mock) 센서 데이터 기반 판단입니다.</p>
           </div>
           <button
-            type="button"
-            onClick={runAutoAssessment}
-            disabled={isLoading}
-            aria-label="새로고침"
-            title="다시 판정하기"
-            className="rounded-full border border-gray-300 bg-white p-3 text-xl shadow-sm hover:bg-gray-50 disabled:opacity-50"
+            onClick={loadSimulationData}
+            disabled={isSimulating}
+            className="flex items-center justify-center rounded-full bg-blue-50 p-3 text-blue-600 hover:bg-blue-100 disabled:opacity-50"
+            title="센서 데이터 새로고침"
           >
-            🔄
+            <svg className={`h-5 w-5 ${isSimulating ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
           </button>
-        </header>
+        </div>
+      </header>
 
-        <RiskGauge result={riskResult} isLoading={isLoading} error={error} photoOverride={photoOverride} />
+      <main className="mx-auto mt-8 max-w-4xl space-y-6 px-4">
+        {/* RiskGauge에 isWaiting props 전달 */}
+        <RiskGauge
+          result={riskResult}
+          isLoading={isAssessing}
+          error={error}
+          photoOverride={photoResult}
+          isWaiting={!riskResult && !isAssessing && !error} 
+        />
 
-        {riskResult && (
-          <div className="mt-4">
-            <PhotoCheck key={sensorData?.timestamp} environmentResult={riskResult} onResult={setPhotoOverride} />
-          </div>
+        {/* 2단계: 착색 상태 확인 (환경 위험도 판정이 끝난 뒤에만 활성화) */}
+        <PhotoCheck
+          environmentResult={riskResult}
+          onResult={setPhotoResult}
+        />
+        {!riskResult && (
+          <p className="-mt-4 text-center text-xs text-gray-400">
+            착색 상태 확인은 위험도 판단 후 이용할 수 있어요.
+          </p>
         )}
 
-        <div className="my-4">
-          <StatusBadges badges={badges} />
-        </div>
+        {sensorData && <StatusBadges badges={getFieldBadges(sensorData)} />}
 
-        <DetailAccordion
-          history={sensorData?.history}
-          values={formValues}
-          onChange={handleFormChange}
-          onSubmit={handleAssessRisk}
-          isSubmitting={isAssessing}
-        />
-      </div>
+        {sensorData && (
+          <DetailAccordion
+            history={history}
+            values={sensorData}
+            onChange={handleValueChange}
+            onSubmit={handleAssessRisk}
+            isSubmitting={isAssessing}
+          />
+        )}
+      </main>
     </div>
   )
 }
 
 export default App
-
-
